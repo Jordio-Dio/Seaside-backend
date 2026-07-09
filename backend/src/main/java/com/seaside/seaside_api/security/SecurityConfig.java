@@ -34,33 +34,32 @@ public class SecurityConfig {
     private final UserDetailsServiceImpl userDetailsService;
 
     // ─── NOUVEAU : lu depuis application.properties ─────────
-    // En local  : app.cors.allowed-origins=http://localhost:3000
-    // En prod   : app.cors.allowed-origins=${FRONTEND_URL}
+    // En local : app.cors.allowed-origins=http://localhost:3000
+    // En prod : app.cors.allowed-origins=${FRONTEND_URL}
     @Value("${app.cors.allowed-origins}")
     private String allowedOrigins;
 
     private static final String[] ROUTES_PUBLIQUES = {
-        "/auth/login",
-        "/auth/register",
-        "/auth/refresh",
-        "/actuator/health"
+            "/auth/login",
+            "/auth/register",
+            "/auth/refresh",
+            "/actuator/health",
+            "/ws/**", // ← AJOUTER CETTE LIGNE
+            "/ws/info/**"
     };
 
     @Bean
     public SecurityFilterChain SecurityFilterChain(HttpSecurity http) throws Exception {
         http
-            .csrf(AbstractHttpConfigurer::disable)
-            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-            .authorizeHttpRequests(auth -> auth
-                .requestMatchers(ROUTES_PUBLIQUES).permitAll()
-                .requestMatchers("/admin/**").hasRole("ADMIN")
-                .anyRequest().authenticated()
-            )
-            .sessionManagement(session ->
-                session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
-            )
-            .authenticationProvider(authenticationProvider())
-            .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
+                .csrf(AbstractHttpConfigurer::disable)
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(ROUTES_PUBLIQUES).permitAll()
+                        .requestMatchers("/admin/**").hasRole("ADMIN")
+                        .anyRequest().authenticated())
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .authenticationProvider(authenticationProvider())
+                .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
@@ -95,7 +94,8 @@ public class SecurityConfig {
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH"));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true);
-        //config.setAllowCredentials(false); // Pour tester avec Postman, sinon mettre true pour le front React
+        // config.setAllowCredentials(false); // Pour tester avec Postman, sinon mettre
+        // true pour le front React
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);
