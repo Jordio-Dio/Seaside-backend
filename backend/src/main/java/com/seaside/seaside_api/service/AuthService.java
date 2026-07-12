@@ -20,16 +20,27 @@ import lombok.RequiredArgsConstructor;
 @Service
 @RequiredArgsConstructor
 public class AuthService {
-    
+
     private final UtilisateurRepository utilisateurRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
     private final AuthenticationManager authenticationManager;
     private final RefreshTokenService refreshTokenService;
 
-    //  ----------  Inscription --------------------
+    // ─── AJOUT : injecter VerificationEmailService ───────────
+    // @RequiredArgsConstructor l'injecte automatiquement via constructeur
+    private final VerificationEmailService verificationEmailService;
+
+
+    // ---------- Inscription --------------------
     public AuthResponse inscrire(RegisterRequest request) {
-            
+
+         // ─── NOUVEAU : vérifier que l'email a été validé ─────
+        if (!verificationEmailService.emailEstVerifie(request.getEmail())) {
+            throw new RuntimeException(
+                    "Email non vérifié — validez votre email avant de vous inscrire");
+        }
+
         // Verifier si email deja utilise
         if (utilisateurRepository.existsByEmail(request.getEmail())) {
             throw new RuntimeException("Cet email est deja utilise");
@@ -40,14 +51,12 @@ public class AuthService {
             throw new RuntimeException("Ce nom d'utilisateur est deja pris");
         }
 
-        
-
-        // Creer l'utilisateur avec mot de passe  hashe par BCrypt
+        // Creer l'utilisateur avec mot de passe hashe par BCrypt
         Utilisateur utilisateur = Utilisateur.builder()
                 .nomUtilisateur(request.getNomUtilisateur())
                 .email(request.getEmail())
                 .motsDePasseHash(passwordEncoder.encode(request.getMotDePasse()))// ← hash BCrypt
-                //.role(getRole(request))
+                // .role(getRole(request))
                 .role(request.getRole())
                 .estActif(true)
                 .build();
@@ -59,26 +68,24 @@ public class AuthService {
         RefreshToken refresh = refreshTokenService.creer(utilisateur);
 
         return AuthResponse.builder()
-            .token(accessToken)
-            .refreshToken(refresh.getToken())
-            .type("Bearer")
-            .email(utilisateur.getEmail())
-            .nomUtilisateur(utilisateur.getNomUtilisateur())
-            .role(utilisateur.getRole())
-            .build();
+                .token(accessToken)
+                .refreshToken(refresh.getToken())
+                .type("Bearer")
+                .email(utilisateur.getEmail())
+                .nomUtilisateur(utilisateur.getNomUtilisateur())
+                .role(utilisateur.getRole())
+                .build();
     }
 
-    //----------------   Connexion ---------------------
+    // ---------------- Connexion ---------------------
     public AuthResponse seConnecter(LoginRequest request) {
 
         // Spring security verifie email + mot de passe automatiquement
         // lance une exception si les credentiels sont incorrectes
         authenticationManager.authenticate(
-            new UsernamePasswordAuthenticationToken(
-                request.getEmail(), 
-                request.getMotDePasse()
-            )
-        );
+                new UsernamePasswordAuthenticationToken(
+                        request.getEmail(),
+                        request.getMotDePasse()));
 
         // Si on arrive ici , les credentials sont corrects
         Utilisateur utilisateur = utilisateurRepository.findByEmail(request.getEmail())
@@ -88,20 +95,20 @@ public class AuthService {
         RefreshToken refresh = refreshTokenService.creer(utilisateur);
 
         return AuthResponse.builder()
-            .token(accesstoken)
-            .refreshToken(refresh.getToken())
-            .type("Bearer")
-            .email(utilisateur.getEmail())
-            .nomUtilisateur(utilisateur.getNomUtilisateur())
-            .role(utilisateur.getRole())
-            .build();
+                .token(accesstoken)
+                .refreshToken(refresh.getToken())
+                .type("Bearer")
+                .email(utilisateur.getEmail())
+                .nomUtilisateur(utilisateur.getNomUtilisateur())
+                .role(utilisateur.getRole())
+                .build();
     }
 
     // -----------Renouveler l'access token
     public AuthResponse rafraichir(String refreshTokenStr) {
         RefreshToken refreshToken = refreshTokenService.valider(refreshTokenStr);
-        Utilisateur utilisateur   = refreshToken.getUtilisateur();
-        String nouvelAccessToken  = jwtUtil.genererToken(utilisateur);
+        Utilisateur utilisateur = refreshToken.getUtilisateur();
+        String nouvelAccessToken = jwtUtil.genererToken(utilisateur);
 
         return AuthResponse.builder()
                 .token(nouvelAccessToken)
@@ -112,7 +119,6 @@ public class AuthService {
                 .role(utilisateur.getRole())
                 .build();
     }
-
 
     // Deconnexion
     public void seDeconnecter() {
@@ -126,9 +132,9 @@ public class AuthService {
             return RoleUsers.ADMIN;
         } else if (r.getRole().equals("CLIENT")) {
             return RoleUsers.CLIENT;
-        }else {
+        } else {
             return RoleUsers.COMPTOIRE;
         }
-        
+
     }
 }

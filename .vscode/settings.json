@@ -3,5 +3,6 @@
     "java.completion.enabled": true,
     "java.completion.maxResults": 50,
     "java.completion.importOrder": ["java", "javax", "org", "com"],
-    "java.codeGeneration.generateComments": true
+    "java.codeGeneration.generateComments": true,
+    "java.configuration.updateBuildConfiguration": "interactive"
 }

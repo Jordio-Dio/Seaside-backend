@@ -43,6 +43,10 @@ public class SecurityConfig {
             "/auth/login",
             "/auth/register",
             "/auth/refresh",
+            "/auth/verify-email",      // ← NOUVEAU
+            "/auth/confirm-otp",       // ← NOUVEAU
+            "/auth/forgot-password",   // ← NOUVEAU
+            "/auth/reset-password",    // ← NOUVEAU
             "/actuator/health",
             "/ws/**", // ← AJOUTER CETTE LIGNE
             "/ws/info/**"
