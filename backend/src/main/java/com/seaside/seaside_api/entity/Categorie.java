@@ -1,6 +1,7 @@
 package com.seaside.seaside_api.entity;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -87,4 +88,8 @@ public class Categorie {
     public Boolean estComplete() {
         return getNombreEntrees() >= capacite;
     }
+
+    @OneToMany(mappedBy = "category")
+@Builder.Default
+private List<Esp32Master> masters = new ArrayList<>();
 }

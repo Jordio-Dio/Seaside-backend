@@ -1,6 +1,7 @@
 package com.seaside.seaside_api.service.esp32;
 
 import com.seaside.seaside_api.dto.response.AlerteDTO;
+import com.seaside.seaside_api.dto.response.BatteryTelemetryDTO;
 import com.seaside.seaside_api.entity.BatteryTelemetry;
 import com.seaside.seaside_api.entity.Esp32Master;
 import com.seaside.seaside_api.entity.Esp32Slave;
@@ -8,6 +9,7 @@ import com.seaside.seaside_api.mqtt.WebSocketPublisher;
 import com.seaside.seaside_api.repository.BatteryTelemetryRepository;
 import com.seaside.seaside_api.repository.Esp32MasterRepository;
 import com.seaside.seaside_api.repository.Esp32SlaveRepository;
+import com.seaside.seaside_api.mapper.Esp32Mapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -16,6 +18,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.List;
+import java.util.UUID;
 
 @Slf4j
 @Service
@@ -28,60 +32,79 @@ private final Esp32SlaveRepository slaveRepository;
 private final BatteryTelemetryRepository telemetryRepository;
 private final WebSocketPublisher webSocketPublisher;
 
+private final Esp32Mapper mapper;
+
 private static final int SEUIL_CRITIQUE = 10;
 private static final int SEUIL_FAIBLE = 20;
 
-// Batterie du master
-public void traiterBatterieMaster(String mac, int batterie) {
+// ===================== MASTER =====================
 
-    masterRepository.findByMacAddress(mac).ifPresent(master -> {
+public void traiterBatterieMaster(String masterMac, int batterie) {
 
-        master.setBatteryLevel(batterie);
-        master.setLastSeen(LocalDateTime.now());
-        masterRepository.save(master);
+    Esp32Master master = masterRepository.findByMacAddress(masterMac)
+            .orElseThrow(() -> new RuntimeException(
+                    "Master introuvable : " + masterMac));
 
-        verifierBatterieMaster(master, batterie);
-        publierTelemetrie(master);
-    });
+    master.setBatteryLevel(batterie);
+    master.setLastSeen(LocalDateTime.now());
+
+    masterRepository.save(master);
+
+    verifierBatterieMaster(master, batterie);
+    publierTelemetrie(master);
+
+    log.info("Master {} mis à jour | batterie={} %", masterMac, batterie);
 }
 
-// État d’un slave
-public void traiterEtatSlave(String mac,
-                             int slaveId,
+// ===================== SLAVE =====================
+
+public void traiterEtatSlave(String masterMac,
+                             int slaveNumber,
                              int batterie,
                              boolean connecte) {
 
-    slaveRepository.findByMacAddress(mac).ifPresent(slave -> {
+    Esp32Master master = masterRepository.findByMacAddress(masterMac)
+            .orElseThrow(() -> new RuntimeException(
+                    "Master introuvable : " + masterMac));
 
-        boolean ancienEtat = Boolean.TRUE.equals(slave.getConnecte());
+    Esp32Slave slave = slaveRepository
+            .findByMasterAndSlaveNumber(master, slaveNumber)
+            .orElseThrow(() -> new RuntimeException(
+                    "Slave " + slaveNumber +
+                    " introuvable pour le master " + masterMac));
 
-        slave.setBatteryLevel(batterie);
-        slave.setConnecte(connecte);
-        slave.setLastSeen(LocalDateTime.now());
+    boolean ancienEtat = Boolean.TRUE.equals(slave.getConnecte());
 
-        slaveRepository.save(slave);
+    slave.setBatteryLevel(batterie);
+    slave.setConnecte(connecte);
+    slave.setLastSeen(LocalDateTime.now());
 
-        enregistrerTelemetrie(slave, batterie);
+    slaveRepository.save(slave);
 
-        if (ancienEtat && !connecte) {
-            publierAlerte(slave,
-                    "SLAVE_DECONNECTE",
-                    "Module " + slaveId + " déconnecté",
-                    "CRITIQUE");
-        }
+    enregistrerTelemetrie(slave, batterie);
 
-        if (connecte && batterie <= SEUIL_FAIBLE) {
-            publierAlerte(slave,
-                    "BATTERIE_SLAVE_FAIBLE",
-                    "Batterie du module " + slaveId + " à " + batterie + "%",
-                    batterie <= SEUIL_CRITIQUE ? "CRITIQUE" : "WARN");
-        }
+    if (ancienEtat && !connecte) {
+        publierAlerte(slave,
+                "SLAVE_DECONNECTE",
+                "Module " + slaveNumber + " déconnecté",
+                "CRITIQUE");
+    }
 
-        publierTelemetrie(slave.getMaster());
-    });
+    if (connecte && batterie <= SEUIL_FAIBLE) {
+        publierAlerte(slave,
+                "BATTERIE_SLAVE_FAIBLE",
+                "Batterie du module " + slaveNumber +
+                " à " + batterie + "%",
+                batterie <= SEUIL_CRITIQUE ? "CRITIQUE" : "WARN");
+    }
+
+    publierTelemetrie(master);
+
+    log.info("Slave {} du master {} mis à jour", slaveNumber, masterMac);
 }
 
-// Enregistrer l’historique batterie
+// ===================== TÉLÉMÉTRIE =====================
+
 private void enregistrerTelemetrie(Esp32Slave slave, int batterie) {
 
     BatteryTelemetry telemetry = BatteryTelemetry.builder()
@@ -93,7 +116,8 @@ private void enregistrerTelemetrie(Esp32Slave slave, int batterie) {
     telemetryRepository.save(telemetry);
 }
 
-// Vérification batterie master
+// ===================== ALERTES =====================
+
 private void verifierBatterieMaster(Esp32Master master, int batterie) {
 
     if (batterie <= SEUIL_CRITIQUE) {
@@ -120,7 +144,8 @@ private void verifierBatterieMaster(Esp32Master master, int batterie) {
     }
 }
 
-// Publication WebSocket
+// ===================== WEBSOCKET =====================
+
 private void publierTelemetrie(Esp32Master master) {
 
     Map<String, Object> data = new HashMap<>();
@@ -134,7 +159,6 @@ private void publierTelemetrie(Esp32Master master) {
             data);
 }
 
-// Publication alerte
 private void publierAlerte(Esp32Slave slave,
                            String code,
                            String message,
@@ -150,5 +174,16 @@ private void publierAlerte(Esp32Slave slave,
                     .build());
 }
 
+public List<BatteryTelemetryDTO> getHistorique(UUID slaveId) {
+
+    Esp32Slave slave = slaveRepository.findById(slaveId)
+            .orElseThrow(() -> new RuntimeException("Slave introuvable"));
+
+    return telemetryRepository
+            .findBySlaveOrderByRecordedAtDesc(slave)
+            .stream()
+            .map(mapper::toTelemetryDTO)
+            .toList();
+}
 
 }

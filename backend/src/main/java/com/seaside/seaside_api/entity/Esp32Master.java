@@ -1,5 +1,6 @@
 package com.seaside.seaside_api.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -18,21 +19,23 @@ import java.util.UUID;
 public class Esp32Master {
 
     @Id
-    @GeneratedValue
+    @GeneratedValue(strategy = GenerationType.UUID)
     @Column(name = "id_master")
     private UUID id;
 
-    @Column(name = "mac_address", nullable = false, unique = true)
+    @Column(name = "mac_address", unique = true, nullable = false, length = 17)
     private String macAddress;
-
-    @Column(name = "firmware_version")
-    private String firmwareVersion;
 
     @Column(name = "battery_level")
     private Integer batteryLevel;
 
     @Column(name = "last_seen")
     private LocalDateTime lastSeen;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "id_category", nullable = false)
+    @JsonIgnore
+    private Categorie category;
 
     @OneToMany(mappedBy = "master", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default

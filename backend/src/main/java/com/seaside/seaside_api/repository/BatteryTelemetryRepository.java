@@ -10,4 +10,5 @@ import java.util.UUID;
 public interface BatteryTelemetryRepository extends JpaRepository<BatteryTelemetry, UUID> {
 
     List<BatteryTelemetry> findBySlaveOrderByRecordedAtDesc(Esp32Slave slave);
+
 }

@@ -3,6 +3,7 @@ package com.seaside.seaside_api.entity;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -24,26 +25,23 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
 import lombok.*;
 
 @Entity
 @Table(name = "evenements")
-@Getter @Setter
+@Getter
+@Setter
 @AllArgsConstructor
 @NoArgsConstructor
 @Builder
 public class Evenement {
-    
+
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "utilisateur_id", nullable = false)     
+    @JoinColumn(name = "utilisateur_id", nullable = false)
     @JsonIgnore
     private Utilisateur utilisateur;
 
@@ -73,10 +71,12 @@ public class Evenement {
     private boolean estActif = true;
 
     @Column(name = "date_creation", nullable = false, updatable = false)
-    private LocalDateTime   dateCreation;
+    private LocalDateTime dateCreation;
 
     @OneToMany(mappedBy = "evenement", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<Categorie> categories;
+    @JsonIgnore
+    @Builder.Default
+    private List<Categorie> categories = new ArrayList<>();
 
     // ------------ Hooks JPA ----------------
     @PrePersist
@@ -86,7 +86,7 @@ public class Evenement {
 
     // ── Méthodes calculées (pas stockées en BDD) ───────────
     public Integer getTotalPersonnes() {
-        if ( categories == null) {
+        if (categories == null) {
             return 0;
         }
         return categories.stream()
@@ -95,16 +95,22 @@ public class Evenement {
     }
 
     public BigDecimal getTotalRevenus() {
-        if (categories == null) return BigDecimal.ZERO;
+        if (categories == null)
+            return BigDecimal.ZERO;
         return categories.stream()
                 .map(Categorie::getRevenuCategorie)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
-    public  Boolean estComplet() {
+    public Boolean estComplet() {
         return getTotalPersonnes() >= capaciteMaximale;
     }
 
-    public void activer() {this.estActif = true; }
-    public void desactiver() { this.estActif = false; }
+    public void activer() {
+        this.estActif = true;
+    }
+
+    public void desactiver() {
+        this.estActif = false;
+    }
 }
