@@ -8,6 +8,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -33,9 +34,6 @@ public class SecurityConfig {
     private final JwtFilter jwtFilter;
     private final UserDetailsServiceImpl userDetailsService;
 
-    // ─── NOUVEAU : lu depuis application.properties ─────────
-    // En local : app.cors.allowed-origins=http://localhost:3000
-    // En prod : app.cors.allowed-origins=${FRONTEND_URL}
     @Value("${app.cors.allowed-origins}")
     private String allowedOrigins;
 
@@ -43,25 +41,33 @@ public class SecurityConfig {
             "/auth/login",
             "/auth/register",
             "/auth/refresh",
-            "/auth/verify-email",      // ← NOUVEAU
-            "/auth/confirm-otp",       // ← NOUVEAU
-            "/auth/forgot-password",   // ← NOUVEAU
-            "/auth/reset-password",    // ← NOUVEAU
+            "/auth/verify-email",
+            "/auth/confirm-otp",
+            "/auth/forgot-password",
+            "/auth/reset-password",
             "/actuator/health",
-            "/ws/**", // ← AJOUTER CETTE LIGNE
-            "/ws/info/**"
+
+            // WebSocket
+            "/ws/**",
+            "/ws/info/**",
+
+            // Swagger / OpenAPI
+            "/swagger-ui/**",
+            "/v3/api-docs/**",
+            "/swagger-ui.html"
     };
 
     @Bean
-    public SecurityFilterChain SecurityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(AbstractHttpConfigurer::disable)
-                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+                .cors(Customizer.withDefaults())
+                .sessionManagement(session ->
+                        session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(ROUTES_PUBLIQUES).permitAll()
                         .requestMatchers("/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated())
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authenticationProvider(authenticationProvider())
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
 
@@ -86,23 +92,18 @@ public class SecurityConfig {
         return config.getAuthenticationManager();
     }
 
-    // ─── CORS — dynamique, plus de valeur en dur ────────────
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
 
-        // CHANGEMENT ICI : split sur la virgule pour supporter
-        // plusieurs origines si besoin (local + prod en même temps)
         config.setAllowedOrigins(List.of(allowedOrigins.split(",")));
-
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH"));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true);
-        // config.setAllowCredentials(false); // Pour tester avec Postman, sinon mettre
-        // true pour le front React
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);
+
         return source;
     }
 }
