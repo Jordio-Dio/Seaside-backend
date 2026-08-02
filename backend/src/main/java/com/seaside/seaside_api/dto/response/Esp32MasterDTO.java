@@ -17,9 +17,21 @@ public class Esp32MasterDTO {
 
     private String macAddress;
 
+    private String adresseMac;
+
+    private String nom;
+
     private Integer batteryLevel;
 
     private LocalDateTime lastSeen;
+
+    private String licence;
+
+    private String moduleId;
+
+    private Integer seuil;
+
+    private Boolean connected;
 
     private Integer nombreSlaves;
 

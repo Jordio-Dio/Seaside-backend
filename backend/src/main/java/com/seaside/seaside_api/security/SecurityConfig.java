@@ -50,6 +50,7 @@ public class SecurityConfig {
             // WebSocket
             "/ws/**",
             "/ws/info/**",
+            "/ws-raw",
 
             // Swagger / OpenAPI
             "/swagger-ui/**",

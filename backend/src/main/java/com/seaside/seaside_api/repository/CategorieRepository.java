@@ -20,6 +20,8 @@ public interface CategorieRepository extends JpaRepository<Categorie, UUID>{
 
     List<Categorie> findByEvenementIdAndEstActif(UUID evenementId, Boolean estActif);   
 
+    Optional<Categorie> findFirstByCouleur(String couleur);
+
     @Query("SELECT COALESCE(SUM(e.comptage), 0) FROM Entree e WHERE e.categorie.id = :categorieId")
     int getNombreEntreesByCategorieId(@Param("categorieId") UUID categorieId);  
 } 

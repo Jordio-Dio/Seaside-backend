@@ -23,12 +23,16 @@ import com.seaside.seaside_api.entity.Entree;
 import com.seaside.seaside_api.entity.Evenement;
 import com.seaside.seaside_api.service.EvenementService;
 
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @RestController
 @RequestMapping("/evenements")
 @RequiredArgsConstructor
+@SecurityRequirement(name = "bearerAuth")
+@Slf4j
 public class EvenementController {
 
     private final EvenementService evenementService;
@@ -50,6 +54,10 @@ public class EvenementController {
     // POST /evenements — créer un événement
     @PostMapping
     public ResponseEntity<Evenement> creer(@Valid @RequestBody EvenementRequest req) {
+
+        log.info("=== POST /evenements appelé ===");
+        log.info("Nom: {}, Lieu: {}", req.getNom(), req.getLieu());
+
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(evenementService.creerEvenement(req));
     }

@@ -16,11 +16,19 @@ public class Esp32SlaveDTO {
 
     private Integer slaveNumber;
 
+    private String slaveId;
+
+    private String nom;
+
     private String macAddress;
 
     private Integer batteryLevel;
 
     private Boolean connecte;
+
+    private Boolean active;
+
+    private Integer seuil;
 
     private LocalDateTime lastSeen;
 

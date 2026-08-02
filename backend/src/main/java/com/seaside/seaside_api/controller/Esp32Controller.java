@@ -6,10 +6,8 @@ import com.seaside.seaside_api.dto.response.BatteryTelemetryDTO;
 import com.seaside.seaside_api.dto.response.DashboardsStatsDTO;
 import com.seaside.seaside_api.dto.response.Esp32MasterDTO;
 import com.seaside.seaside_api.dto.response.Esp32SlaveDTO;
-import com.seaside.seaside_api.dto.response.SlaveStatusDTO;
-import com.seaside.seaside_api.entity.ModuleEsp32;
 import com.seaside.seaside_api.entity.Utilisateur;
-import com.seaside.seaside_api.service.Esp32Service;
+import com.seaside.seaside_api.service.esp32.Esp32CommandService;
 import com.seaside.seaside_api.service.esp32.Esp32QueryService;
 
 import jakarta.validation.Valid;
@@ -27,7 +25,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class Esp32Controller {
 
-    private final Esp32Service esp32Service;
+    private final Esp32CommandService commandService;
 
     private final Esp32QueryService queryService;
 
@@ -44,26 +42,26 @@ public class Esp32Controller {
     // POST /esp32/masters
     // Enregistrer un nouveau master ESP32
     @PostMapping("/masters")
-    public ResponseEntity<ModuleEsp32> enregistrerMaster(
+    public ResponseEntity<Esp32MasterDTO> enregistrerMaster(
             @Valid @RequestBody EnregistrerMasterRequest req) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(esp32Service.enregistrerMaster(req, moi()));
+                .body(commandService.enregistrerMaster(req));
     }
 
     // POST /esp32/masters/{masterId}/slaves
-    // Associer un slave à une catégorie (config dynamique)
+    // Enregistrer un slave sous un master
     @PostMapping("/masters/{masterId}/slaves")
-    public ResponseEntity<SlaveStatusDTO> associerSlave(
+    public ResponseEntity<Esp32SlaveDTO> associerSlave(
             @PathVariable UUID masterId,
             @Valid @RequestBody AssocierSlaveRequest req) {
-        return ResponseEntity.ok(esp32Service.associerSlave(masterId, req, moi()));
+        return ResponseEntity.ok(commandService.associerSlave(masterId, req));
     }
 
     // POST /esp32/masters/{masterId}/config/envoyer
-    // Renvoyer manuellement la config au firmware
+    // Renvoyer manuellement la config (seuil) au firmware
     @PostMapping("/masters/{masterId}/config/envoyer")
     public ResponseEntity<Void> envoyerConfig(@PathVariable UUID masterId) {
-        esp32Service.envoyerConfigManuelle(masterId, moi());
+        commandService.envoyerConfig(masterId);
         return ResponseEntity.ok().build();
     }
 
@@ -76,7 +74,7 @@ public class Esp32Controller {
     @GetMapping("/evenements/{evenementId}/dashboard")
     public ResponseEntity<DashboardsStatsDTO> getDashboard(
             @PathVariable UUID evenementId) {
-        return ResponseEntity.ok(esp32Service.getDashboard(evenementId, moi()));
+        return ResponseEntity.ok(queryService.getEvenementDashboard(evenementId, moi()));
     }
 
     @GetMapping("/masters")

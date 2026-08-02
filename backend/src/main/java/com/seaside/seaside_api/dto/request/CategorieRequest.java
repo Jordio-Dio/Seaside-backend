@@ -23,5 +23,6 @@ public class CategorieRequest {
     @Min(value = 0)
     private Integer capacite = 0;
 
+    private String couleur; // code dispositif / licence associée à l'entrée
 
 }

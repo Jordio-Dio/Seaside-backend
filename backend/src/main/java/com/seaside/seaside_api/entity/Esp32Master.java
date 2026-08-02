@@ -32,8 +32,23 @@ public class Esp32Master {
     @Column(name = "last_seen")
     private LocalDateTime lastSeen;
 
+    @Column(name = "nom", length = 100)
+    private String nom;
+
+    @Column(name = "licence", unique = true, length = 50)
+    private String licence;
+
+    @Column(name = "module_id", length = 50)
+    private String moduleId;
+
+    @Column(name = "seuil")
+    private Integer seuil;
+
+    @Column(name = "connected")
+    private Boolean connected;
+
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "id_category", nullable = false)
+    @JoinColumn(name = "id_category")
     @JsonIgnore
     private Categorie category;
 

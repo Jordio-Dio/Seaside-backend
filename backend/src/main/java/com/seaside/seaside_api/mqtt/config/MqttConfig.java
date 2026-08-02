@@ -1,6 +1,6 @@
 package com.seaside.seaside_api.mqtt.config;
 
-import com.seaside.seaside_api.mqtt.router.MqttTelemetryRouter;
+import com.seaside.seaside_api.mqtt.router.SeasideMqttRouter;
 import lombok.extern.slf4j.Slf4j;
 import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
 import org.springframework.beans.factory.annotation.Value;
@@ -102,7 +102,7 @@ public MqttPahoMessageDrivenChannelAdapter mqttAdapter() {
 @Bean
 @ServiceActivator(inputChannel = "mqttInputChannel")
 public MessageHandler mqttMessageHandler(
-        MqttTelemetryRouter telemetryRouter) {
+        SeasideMqttRouter router) {
 
     return message -> {
 
@@ -117,7 +117,7 @@ public MessageHandler mqttMessageHandler(
                 topic,
                 payload);
 
-        telemetryRouter.router(topic, payload);
+        router.router(topic, payload);
     };
 }
 

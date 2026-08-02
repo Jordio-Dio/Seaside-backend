@@ -27,5 +27,10 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
         registry.addEndpoint("/ws")
                 .setAllowedOrigins(allowedOrigins.split(","))
                 .withSockJS();
+
+        // Endpoint brut (sans SockJS) pour déboguer en Postman.
+        // Le navigateur (frontend) continue d'utiliser /ws via SockJS.
+        registry.addEndpoint("/ws-raw")
+                .setAllowedOrigins(allowedOrigins.split(","));
     }
 }

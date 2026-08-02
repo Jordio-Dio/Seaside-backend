@@ -21,8 +21,14 @@ public class Esp32Mapper {
                 return Esp32MasterDTO.builder()
                                 .id(master.getId())
                                 .macAddress(master.getMacAddress())
+                                .adresseMac(master.getMacAddress())
+                                .nom(master.getNom())
                                 .batteryLevel(master.getBatteryLevel())
                                 .lastSeen(master.getLastSeen())
+                                .licence(master.getLicence())
+                                .moduleId(master.getModuleId())
+                                .seuil(master.getSeuil())
+                                .connected(master.getConnected())
 
                                 .categorieId(
                                                 master.getCategory() != null ? master.getCategory().getId() : null)
@@ -56,9 +62,13 @@ public class Esp32Mapper {
                 return Esp32SlaveDTO.builder()
                                 .id(slave.getId())
                                 .slaveNumber(slave.getSlaveNumber())
+                                .slaveId(slave.getSlaveId())
+                                .nom(slave.getNom())
                                 .macAddress(slave.getMacAddress())
                                 .batteryLevel(slave.getBatteryLevel())
                                 .connecte(slave.getConnecte())
+                                .active(slave.getActive())
+                                .seuil(slave.getSeuil())
                                 .lastSeen(slave.getLastSeen())
                                 .masterId(slave.getMaster().getId())
                                 .build();

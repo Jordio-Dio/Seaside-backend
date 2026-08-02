@@ -1,16 +1,23 @@
 package com.seaside.seaside_api.service.esp32;
 
 import com.seaside.seaside_api.dto.response.*;
+import com.seaside.seaside_api.entity.Categorie;
 import com.seaside.seaside_api.entity.Esp32Master;
 import com.seaside.seaside_api.entity.Esp32Slave;
+import com.seaside.seaside_api.entity.Evenement;
 import com.seaside.seaside_api.mapper.Esp32Mapper;
 import com.seaside.seaside_api.repository.BatteryTelemetryRepository;
+import com.seaside.seaside_api.repository.EntreeRepository;
+import com.seaside.seaside_api.repository.EvenementRepository;
 import com.seaside.seaside_api.repository.Esp32MasterRepository;
 import com.seaside.seaside_api.repository.Esp32SlaveRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 
@@ -19,9 +26,14 @@ import java.util.UUID;
 @Transactional(readOnly = true)
 public class Esp32QueryService {
 
+    private static final int SEUIL_CRITIQUE = 10;
+    private static final int SEUIL_FAIBLE = 20;
+
     private final Esp32MasterRepository masterRepository;
     private final Esp32SlaveRepository slaveRepository;
     private final BatteryTelemetryRepository telemetryRepository;
+    private final EvenementRepository evenementRepository;
+    private final EntreeRepository entreeRepository;
     private final Esp32Mapper mapper;
 
     //récupérer tous les masters
@@ -88,6 +100,82 @@ public List<BatteryTelemetryDTO> getHistorique(UUID slaveId) {
             .stream()
             .map(mapper::toTelemetryDTO)
             .toList();
+}
+
+//Dashboard complet d'un événement (comptages + télémétrie + slaves)
+public DashboardsStatsDTO getEvenementDashboard(UUID evenementId, UUID utilisateurId) {
+
+    Evenement ev = evenementRepository
+            .findByIdAndUtilisateurId(evenementId, utilisateurId)
+            .orElseThrow(() ->
+                    new RuntimeException("Événement introuvable ou accès refusé"));
+
+    List<Esp32Master> masters = masterRepository
+            .findByCategory_Evenement_Id(evenementId);
+
+    List<SlaveStatusDTO> slaves = masters.stream()
+            .flatMap(m -> m.getSlaves().stream())
+            .map(this::toSlaveStatusDTO)
+            .toList();
+
+    Esp32Master ref = masters.stream()
+            .max(Comparator.comparing(Esp32Master::getLastSeen,
+                    Comparator.nullsFirst(Comparator.naturalOrder())))
+            .orElse(null);
+
+    List<CategorieStatDTO> categories = ev.getCategories().stream()
+            .map(this::toCategorieStatDTO)
+            .toList();
+
+    return DashboardsStatsDTO.builder()
+            .evenementId(ev.getId().toString())
+            .nomEvenement(ev.getNom())
+            .totalPersonnes(entreeRepository.sumComptageByEvenement(evenementId))
+            .totalRevenus(totalRevenus(ev))
+            .categories(categories)
+            .batterieMaster(ref != null ? ref.getBatteryLevel() : null)
+            .masterConnecte(ref != null ? Boolean.TRUE.equals(ref.getConnected()) : false)
+            .derniereActiviteMaster(ref != null ? ref.getLastSeen() : null)
+            .slaves(slaves)
+            .alertes(new ArrayList<>())
+            .build();
+}
+
+private CategorieStatDTO toCategorieStatDTO(Categorie cat) {
+    int nombreEntrees = entreeRepository.sumComptageByCategorie(cat.getId());
+    return CategorieStatDTO.builder()
+            .categorieId(cat.getId())
+            .nom(cat.getNom())
+            .couleur(cat.getCouleur())
+            .prix(cat.getPrix())
+            .nombreEntrees(nombreEntrees)
+            .revenu(cat.getPrix().multiply(BigDecimal.valueOf(nombreEntrees)))
+            .capacite(cat.getCapacite())
+            .estComplete(nombreEntrees >= cat.getCapacite())
+            .build();
+}
+
+private SlaveStatusDTO toSlaveStatusDTO(Esp32Slave s) {
+    int bat = s.getBatteryLevel() != null ? s.getBatteryLevel() : 0;
+    String niveau = bat <= SEUIL_CRITIQUE ? "CRITIQUE" : bat <= SEUIL_FAIBLE ? "FAIBLE" : "OK";
+    Categorie cat = s.getMaster() != null ? s.getMaster().getCategory() : null;
+    return SlaveStatusDTO.builder()
+            .slaveId(s.getSlaveNumber())
+            .nom(s.getNom() != null ? s.getNom() : "Slave " + s.getSlaveNumber())
+            .batterie(bat)
+            .estConnecte(Boolean.TRUE.equals(s.getConnecte()))
+            .categorieAssociee(cat != null ? cat.getNom() : null)
+            .categorieId(cat != null ? cat.getId() : null)
+            .derniereActivite(s.getLastSeen())
+            .niveauBatterie(niveau)
+            .build();
+}
+
+private BigDecimal totalRevenus(Evenement ev) {
+    return ev.getCategories().stream()
+            .map(c -> c.getPrix().multiply(
+                    BigDecimal.valueOf(entreeRepository.sumComptageByCategorie(c.getId()))))
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
 }
 
 

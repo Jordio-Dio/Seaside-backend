@@ -61,6 +61,9 @@ public class Categorie {
     @Column(name = "capacite", nullable = false)
     private Integer capacite = 0;
 
+    @Column(name = "couleur", length = 50)
+    private String couleur;
+
     @Column(name = "est_actif", nullable = false)
     @Builder.Default
     private Boolean estActif = true;
@@ -70,7 +73,6 @@ public class Categorie {
     private List<Entree> entrees;
 
     // Methodes calcules
-    @JsonIgnore
     public Integer getNombreEntrees() {
         if (entrees == null)
             return 0;
@@ -79,7 +81,6 @@ public class Categorie {
                 .sum();
     }
 
-    @JsonIgnore
     public BigDecimal getRevenuCategorie() {
         return prix.multiply(BigDecimal.valueOf(getNombreEntrees()));
     }
@@ -90,6 +91,7 @@ public class Categorie {
     }
 
     @OneToMany(mappedBy = "category")
-@Builder.Default
-private List<Esp32Master> masters = new ArrayList<>();
+    @JsonIgnore
+    @Builder.Default
+    private List<Esp32Master> masters = new ArrayList<>();
 }

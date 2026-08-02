@@ -1,0 +1,139 @@
+Documentation MQTT – Module Seaside
+Counter
+1. Broker MQTT
+Le module communique avec le broker MQTT suivant :
+Paramètre Valeur
+Broker 53cc1d1dc297463f9f511baf26ee908e.s1.eu.hivemq.cloud
+Port 8883
+Sécurité TLS/SSL
+Authentification Oui (Username / Password)
+2. Topics publiés par le module
+A. Télémétrie du module principal (Master)
+Topic
+seaside/telemetry/master
+Description
+Publié périodiquement lorsque le module est connecté.
+Format JSON
+{
+ "mac": "30:C9:22:12:34:56",
+ "moduleId": "MASTER_01",
+ "role": "master",
+ "count": 15,
+ "total": 58,
+ "battery": 100,
+ "licence": "ABC123",
+ "timestamp": 1254785,
+ "connected": true
+}
+Description des champs
+Champ Type Description
+mac String Adresse MAC du module
+moduleId String Identifiant du module
+role String master
+Champ Type Description
+count Integer Nombre de personnes détectées par ce module
+total Integer Nombre total calculé par le système
+battery Integer Niveau batterie (%)
+licence String Code licence du système
+timestamp Integer Temps système (millisecondes)
+connected Boolean Etat de connexion WiFi
+B. Notification d'entrée
+Topic
+seaside/entrees/{licence}
+Exemple
+seaside/entrees/ABC123
+Si aucune licence n'est définie :
+seaside/entrees/default
+Format JSON
+{
+ "mac": "30:C9:22:12:34:56",
+ "moduleId": "MASTER_01",
+ "role": "master",
+ "count": 16,
+ "total": 59,
+ "battery": 100,
+ "licence": "ABC123",
+ "timestamp": 1259000,
+ "connected": true
+}
+Utilisation
+Publié à chaque détection d'une nouvelle entrée.
+C. Télémétrie des modules esclaves
+Topic
+seaside/telemetry/slave/{slaveId}
+Exemple
+seaside/telemetry/slave/SLAVE_01
+Format JSON
+{
+  "slaveId": "SLAVE_01",
+  "mac": "18:FE:34:56:78:90",
+  "count": 8,
+  "seuil": 120,
+  "active": true,
+  "battery": 87
+}
+Description
+Champ Description
+slaveId Identifiant de
+l'esclave
+mac Adresse MAC
+count Compteur local
+seuil Seuil configuré
+active Etat du module
+battery Niveau batterie (%) — OPTIONNEL. S'il est présent,
+l'application enregistre l'historique batterie et déclenche
+les alertes BATTERIE_SLAVE_FAIBLE / BATTERIE_SLAVE_CRITIQUE.
+Recommandé : envoyer à chaque télémétrie.
+D. Alertes
+Topic
+seaside/alerte
+Format JSON
+{
+ "mac": "30:C9:22:12:34:56",
+ "moduleId": "MASTER_01",
+ "alerte": "Erreur configuration : seuil hors limites (500 cm)"
+}
+Utilisation
+Ce topic informe l'application d'une anomalie ou d'une erreur détectée par le module.
+3. Topics auxquels le module est abonné
+L'application peut envoyer des commandes au module via les topics suivants.
+Configuration
+Format
+Avec MAC contenant les deux-points :
+seaside/config/30:C9:22:12:34:56
+ou sans les deux-points :
+seaside/config/30C922123456
+Message attendu
+{
+ "seuil": 120
+}
+Le champ seuil représente le seuil de détection (en centimètres).
+Le module vérifie que la valeur est comprise entre SEUIL_MIN et SEUIL_MAX avant de
+l'enregistrer.
+Si la valeur est invalide, une alerte est publiée sur :
+seaside/alerte
+4. Résumé des échanges MQTT
+Direction Topic Description
+Module →
+Software seaside/telemetry/master État du module principal
+Module →
+Software seaside/entrees/{licence} Notification d'une entrée
+Module →
+Software seaside/telemetry/slave/{slaveId} État des modules esclaves
+Module →
+Software seaside/alerte Alertes et erreurs
+Software →
+Module seaside/config/{MAC} Configuration du seuil de
+détection
+5. Exemple de scénario d'utilisation
+1. Le module se connecte au broker MQTT.
+2. Il publie régulièrement sa télémétrie sur seaside/telemetry/master.
+3. Lorsqu'une personne est détectée, il publie un événement sur
+seaside/entrees/{licence}.
+4. Si un module esclave est présent, celui-ci publie sa télémétrie sur
+seaside/telemetry/slave/{slaveId}.
+5. En cas d'erreur (par exemple un seuil invalide), le module publie un message sur
+seaside/alerte.
+6. L'application peut modifier le seuil de détection en publiant un message JSON sur
+seaside/config/{MAC}. Le module valide la valeur, l'enregistre et l'applique
+automatiquement.

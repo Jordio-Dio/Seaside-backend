@@ -6,17 +6,19 @@ import lombok.Data;
  
 import java.util.UUID;
  
-// ─── Associer un slave à une catégorie (dynamique) ──────
-// C'est ici que l'admin dit : "Slave 1 = Porte VIP = Catégorie VIP"
+// ─── Associer un slave à un master (dynamique) ─────────
+// La catégorie appartient au master sous le modèle B
 @Data
 public class AssocierSlaveRequest {
- 
+  
     @NotNull(message = "Le numéro du slave est obligatoire")
     private Integer slaveId;       // numéro physique du slave (1, 2, 3...)
- 
+  
     private String nom;            // "Slave Porte VIP"
- 
-    // La catégorie à laquelle ce slave est associé
-    // null = slave non encore configuré
+
+    private String macAddress;     // adresse MAC du slave
+
+    // Catégorie rattachée au master de ce slave
+    // null = catégorie inchangée
     private UUID categorieId;
 }
