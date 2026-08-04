@@ -109,11 +109,11 @@ public class MqttSubscriber {
         }
 
         Categorie cat = catOpt.get();
-        String evId = cat.getEvenement().getId().toString();
+        String evenementId = cat.getEvenement().getId().toString();
 
-        // vertifier capacite
+        // verifier capacite
         if (cat.estComplete()) {
-            webSocketPublisher.publierAlerte(evId, AlerteDTO.builder()
+            webSocketPublisher.publierAlerte(evenementId, AlerteDTO.builder()
                     .code("CAPACITE_MAX")
                     .message("Capacité maximale atteinte pour : " + cat.getNom())
                     .niveau("WARN")

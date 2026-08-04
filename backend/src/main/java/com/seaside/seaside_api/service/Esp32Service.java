@@ -135,18 +135,18 @@ public class Esp32Service {
             master.setDerniereActivite(LocalDateTime.now());
             moduleRepository.save(master);
 
-            String evId = master.getEvenement().getId().toString();
+            String evenementId = master.getEvenement().getId().toString();
 
             // Alertes batterie
             if (batterie <= SEUIL_CRITIQUE) {
-                webSocketPublisher.publierAlerte(evId, AlerteDTO.builder()
+                webSocketPublisher.publierAlerte(evenementId, AlerteDTO.builder()
                         .code("BATTERIE_MASTER_CRITIQUE")
-                        .message("⚠️ Batterie master à " + batterie + "% — intervention urgente !")
+                        .message("Batterie master à " + batterie + "% — intervention urgente !")
                         .niveau("CRITIQUE")
                         .declencheLe(LocalDateTime.now())
                         .build());
             } else if (batterie <= SEUIL_FAIBLE) {
-                webSocketPublisher.publierAlerte(evId, AlerteDTO.builder()
+                webSocketPublisher.publierAlerte(evenementId, AlerteDTO.builder()
                         .code("BATTERIE_MASTER_FAIBLE")
                         .message("🔋 Batterie master à " + batterie + "% — recharger bientôt")
                         .niveau("WARN")
