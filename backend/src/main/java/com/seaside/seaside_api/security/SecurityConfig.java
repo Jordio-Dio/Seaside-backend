@@ -47,6 +47,10 @@ public class SecurityConfig {
             "/auth/reset-password",
             "/actuator/health",
 
+            // Health
+            "/health",
+            "/actuator/health",
+
             // WebSocket
             "/ws/**",
             "/ws/info/**",
@@ -63,8 +67,7 @@ public class SecurityConfig {
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(Customizer.withDefaults())
-                .sessionManagement(session ->
-                        session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(ROUTES_PUBLIQUES).permitAll()
                         .requestMatchers("/admin/**").hasRole("ADMIN")
