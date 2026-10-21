@@ -1,0 +1,496 @@
+# Contrat d'API OpenAPI — Seaside / SmartCount (v0.1 — DRAFT)
+# Périmètre : les NOUVEAUX endpoints issus des décisions D1–D5 et des corrections P0
+# (cf. docs/INSCRIPTION_ORGANISATEUR_RECOMMANDATIONS.md).
+# Les endpoints déjà servis par le code existant (login, OTP, esp32…) restent décrits
+# par Springdoc sur /v3/api-docs — ce contrat cible ce qui est à IMPLÉMENTER.
+# Validation : `npx @redocly/cli lint docs/openapi.yaml` ou import Swagger Editor.
+
+openapi: 3.0.3
+
+info:
+  title: Seaside API — Onboarding organisateur, abonnement, publication, réservation
+  description: |
+    Contrat des fonctionnalités à implémenter (scénario 3 hybride) :
+    - inscription **sans champ role** (rôle forcé CLIENT côté serveur — correction P0) ;
+    - demande d'activation organisateur → validation admin (approuver / refuser / ignorer) ;
+    - abonnement payé **en espèces**, saisi par l'admin, qui pilote licence et déblocage ;
+    - publication d'événements modérée (aucune visibilité publique sans validation) ;
+    - réservation visiteur **non engageante**, capacité engagée uniquement au paiement.
+  version: 0.1.0
+
+servers:
+  - url: http://localhost:8080/api
+    description: développement local
+  - url: https://api.seaside.example/api
+    description: production
+
+tags:
+  - name: Auth
+    description: Inscription (corrections P0)
+  - name: Demandes
+    description: Demande d'activation organisateur et traitement admin
+  - name: Abonnements
+    description: Abonnement en espèces saisi par l'admin
+  - name: Publications
+    description: Soumission et modération des événements
+  - name: Public
+    description: Accès anonyme (catalogue, réservations)
+
+security:
+  - bearerAuth: []
+
+paths:
+  # ─── Auth (correction P0 : suppression du champ role) ──────────────
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Inscription — rôle forcé CLIENT côté serveur
+      description: |
+        **Correction P0** : le DTO `RegisterRequest` ne contient PLUS le champ `role`.
+        Le serveur force toujours `CLIENT` (l'ancien champ acceptait `"role":"ADMIN"`
+        = élévation de privilège). L'email doit être vérifié (OTP) au préalable.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegisterRequest' }
+      responses:
+        '201':
+          description: Compte créé (dashboard verrouillé tant que non abonné)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthResponse' }
+        '400': { $ref: '#/components/responses/Erreur400' }
+        '409': { $ref: '#/components/responses/Erreur409' }
+        '429': { $ref: '#/components/responses/Erreur429' }
+
+  # ─── D1 : demande d'activation organisateur ────────────────────────
+  /organisateur/demandes:
+    post:
+      tags: [Demandes]
+      summary: Déposer sa demande d'activation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DemandeRequest' }
+      responses:
+        '201':
+          description: Demande enregistrée (SOUMISE)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DemandeResponse' }
+        '409':
+          description: Une demande active existe déjà pour ce compte
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Erreur' }
+    get:
+      tags: [Demandes]
+      summary: Suivre sa propre demande
+      responses:
+        '200':
+          description: Dernière demande de l'utilisateur connecté
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DemandeResponse' }
+        '404': { $ref: '#/components/responses/Erreur404' }
+
+  /admin/demandes:
+    get:
+      tags: [Demandes]
+      summary: Liste des demandes (console admin)
+      description: 'Réservé ROLE_ADMIN. Job planifié — SOUMISE > 7 j → EXPIREE ; EXPIREE/REFUSEE > 30 j → purge.'
+      parameters:
+        - { name: statut, in: query, schema: { $ref: '#/components/schemas/StatutDemande' } }
+        - { name: page, in: query, schema: { type: integer, default: 0 } }
+        - { name: taille, in: query, schema: { type: integer, default: 20 } }
+      responses:
+        '200':
+          description: Page de demandes
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  contenu:
+                    type: array
+                    items: { $ref: '#/components/schemas/DemandeResponse' }
+                  totalElements: { type: integer }
+                  totalPages: { type: integer }
+        '403': { $ref: '#/components/responses/Erreur403' }
+
+  /admin/demandes/{id}/approuver:
+    post:
+      tags: [Demandes]
+      summary: Approuver — la licence reste à émettre après paiement (cf. abonnements)
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200': { description: Demande APPROUVEE + email à l'organisateur }
+        '404': { $ref: '#/components/responses/Erreur404' }
+        '409': { description: 'Statut incompatible (déjà traitée)' }
+
+  /admin/demandes/{id}/refuser:
+    post:
+      tags: [Demandes]
+      summary: Refuser avec motif obligatoire
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [motif]
+              properties:
+                motif: { type: string, minLength: 10, maxLength: 500 }
+      responses:
+        '200': { description: Demande REFUSEE + email motivé }
+        '400': { $ref: '#/components/responses/Erreur400' }
+
+  /admin/demandes/{id}/ignorer:
+    post:
+      tags: [Demandes]
+      summary: Remettre en file (bouton « ignorer » des notes)
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200': { description: Remise EN_REVUE }
+        '404': { $ref: '#/components/responses/Erreur404' }
+
+  # ─── D2 : abonnement en espèces saisi par l'admin ──────────────────
+  /admin/abonnements:
+    post:
+      tags: [Abonnements]
+      summary: Enregistrer un paiement reçu en espèces et débloquer
+      description: |
+        Passe l'abonnement à ACTIF, émet/renouvelle la licence (`SMC-…`) et notifie
+        l'organisateur. Chaque saisie est journalisée (preuve de créance).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AbonnementRequest' }
+      responses:
+        '201':
+          description: Abonnement ACTIF — dashboard déverrouillé
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AbonnementResponse' }
+        '400': { $ref: '#/components/responses/Erreur400' }
+    get:
+      tags: [Abonnements]
+      summary: Historique des abonnements d'un organisateur
+      parameters:
+        - { name: utilisateurId, in: query, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Liste triée par date de paiement
+          content:
+            application/json:
+              type: array
+              items: { $ref: '#/components/schemas/AbonnementResponse' }
+
+  # ─── D4 : publication modérée ──────────────────────────────────────
+  /evenements/{id}/soumettre:
+    post:
+      tags: [Publications]
+      summary: Soumettre un événement BROUILLON à validation
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200': { description: Statut SOUMISE + notification admin }
+        '403': { $ref: '#/components/responses/Erreur403' }
+        '409': { description: 'Statut incompatible (pas BROUILLON)' }
+
+  /admin/evenements:
+    get:
+      tags: [Publications]
+      summary: Événements à modérer
+      parameters:
+        - { name: statut, in: query, schema: { $ref: '#/components/schemas/StatutPublication' } }
+      responses:
+        '200':
+          description: Liste à modérer
+          content:
+            application/json:
+              type: array
+              items: { $ref: '#/components/schemas/EvenementPublic' }
+
+  /admin/evenements/{id}/accepter:
+    post:
+      tags: [Publications]
+      summary: Publier (devient visible sur la page publique)
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200': { description: 'PUBLIEE, journalisée (adminId + horodatage)' }
+
+  /admin/evenements/{id}/masquer:
+    post:
+      tags: [Publications]
+      summary: Masquer / refuser (motif obligatoire)
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [motif]
+              properties:
+                motif: { type: string, minLength: 10, maxLength: 500 }
+      responses:
+        '200': { description: MASQUEE — retirée immédiatement du catalogue }
+        '400': { $ref: '#/components/responses/Erreur400' }
+
+  # ─── D5 : public + réservation non engageante ──────────────────────
+  /public/evenements:
+    get:
+      tags: [Public]
+      summary: Catalogue public — uniquement les événements PUBLIEE
+      security: []
+      parameters:
+        - { name: ville, in: query, schema: { type: string } }
+        - { name: date, in: query, schema: { type: string, format: date } }
+        - { name: categorie, in: query, schema: { type: string } }
+        - { name: page, in: query, schema: { type: integer, default: 0 } }
+      responses:
+        '200':
+          description: Catalogue paginé (jamais de BROUILLON/SOUMISE/MASQUEE)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  contenu:
+                    type: array
+                    items: { $ref: '#/components/schemas/EvenementPublic' }
+                  totalElements: { type: integer }
+
+  /public/reservations:
+    post:
+      tags: [Public]
+      summary: Intention de réservation — ne consomme AUCUNE capacité
+      description: |
+        Crée une réservation EN_ATTENTE avec TTL 15 min. La place n'est engagée
+        qu'à la confirmation du paiement (au guichet, en espèces) — voir
+        POST /reservations/{id}/confirmer-paiement. Expiration → annulation auto.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReservationRequest' }
+      responses:
+        '201':
+          description: Intention enregistrée (capacité inchangée)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReservationResponse' }
+        '400': { $ref: '#/components/responses/Erreur400' }
+        '429': { $ref: '#/components/responses/Erreur429' }
+
+  /reservations/{id}/confirmer-paiement:
+    post:
+      tags: [Publications]
+      summary: Paiement au guichet — c'est ICI que la capacité est engagée
+      description: |
+        Réservé ORGANISATEUR (JWT). Transaction atomique `FOR UPDATE` :
+        capacité restante insuffisante → 409, aucun débit (survente impossible,
+        car rien n'était réservé avant).
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [montant]
+              properties:
+                montant: { type: number, format: decimal, minimum: 0 }
+                moyen: { type: string, enum: [ESPECES], default: ESPECES }
+      responses:
+        '200':
+          description: PAYEE — place engagée, billet QR émis
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReservationResponse' }
+        '409':
+          description: Capacité épuisée — rembourser le visiteur
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Erreur' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    RegisterRequest:
+      type: object
+      required: [nomUtilisateur, email, motDePasse]
+      description: 'Plus de champ `role` — correction P0 (rôle forcé CLIENT).'
+      properties:
+        nomUtilisateur: { type: string, minLength: 3, maxLength: 50 }
+        email: { type: string, format: email }
+        motDePasse: { type: string, minLength: 12, description: 'NIST SP 800-63B — 12 min après correctif P0' }
+
+    AuthResponse:
+      type: object
+      properties:
+        token: { type: string }
+        refreshToken: { type: string }
+        type: { type: string, example: Bearer }
+        email: { type: string }
+        nomUtilisateur: { type: string }
+        role: { $ref: '#/components/schemas/Role' }
+
+    Role:
+      type: string
+      enum: [ADMIN, ORGANISATEUR, CLIENT, COMPTOIRE]
+      description: 'ORGANISATEUR = rôle obtenu après activation (D1).'
+
+    StatutDemande:
+      type: string
+      enum: [SOUMISE, EN_REVUE, APPROUVEE, REFUSEE, EXPIREE]
+
+    DemandeRequest:
+      type: object
+      required: [typeCompte, motif]
+      properties:
+        typeCompte:
+          type: string
+          enum: [ORGANISATEUR, ASSOCIATION, MAIRIE, ENTREPRISE, CLUB]
+          description: Décision « cas d'usage non-organisateur » — critères de validation adaptés
+        organisation: { type: string, maxLength: 120 }
+        ville: { type: string, maxLength: 80 }
+        motif: { type: string, minLength: 20, maxLength: 1000 }
+
+    DemandeResponse:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        utilisateurId: { type: string, format: uuid }
+        nomUtilisateur: { type: string }
+        typeCompte: { type: string }
+        statut: { $ref: '#/components/schemas/StatutDemande' }
+        dateDemande: { type: string, format: date-time }
+        dateTraitement: { type: string, format: date-time, nullable: true }
+        traitePar: { type: string, nullable: true }
+        motif: { type: string, nullable: true }
+
+    StatutAbonnement:
+      type: string
+      enum: [EN_ATTENTE, ACTIF, EN_GRACE, SUSPENDU]
+
+    AbonnementRequest:
+      type: object
+      required: [utilisateurId, dureeMois, montant, reference]
+      properties:
+        utilisateurId: { type: string, format: uuid }
+        dureeMois: { type: integer, minimum: 1, maximum: 24 }
+        montant: { type: number, format: decimal, minimum: 0 }
+        moyen: { type: string, enum: [ESPECES], default: ESPECES }
+        reference: { type: string, maxLength: 60, description: 'Référence manuelle du paiement (reçu, initiales…)' }
+        remarque: { type: string, maxLength: 500 }
+
+    AbonnementResponse:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        utilisateurId: { type: string, format: uuid }
+        statut: { $ref: '#/components/schemas/StatutAbonnement' }
+        debut: { type: string, format: date }
+        fin: { type: string, format: date }
+        moyen: { type: string }
+        reference: { type: string }
+        traitePar: { type: string }
+        licenceCode: { type: string, example: 'SMC-A1B2C3D4E5F6-20270118-9F3A' }
+
+    StatutPublication:
+      type: string
+      enum: [BROUILLON, SOUMISE, PUBLIEE, MASQUEE]
+
+    EvenementPublic:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        nom: { type: string }
+        dateEvenement: { type: string, format: date }
+        lieu: { type: string, nullable: true }
+        description: { type: string, nullable: true }
+        capaciteMaximale: { type: integer }
+        statut: { $ref: '#/components/schemas/StatutPublication' }
+        categories:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: string, format: uuid }
+              nom: { type: string }
+              prix: { type: number, format: decimal }
+              placesRestantes: { type: integer }
+
+    ReservationRequest:
+      type: object
+      required: [evenementId, categorieId, quantite, email]
+      properties:
+        evenementId: { type: string, format: uuid }
+        categorieId: { type: string, format: uuid }
+        quantite: { type: integer, minimum: 1, maximum: 20 }
+        email: { type: string, format: email }
+
+    ReservationResponse:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        codeReservation: { type: string }
+        statut:
+          type: string
+          enum: [EN_ATTENTE, PAYEE, ANNULEE, EXPIREE]
+        expireLe: { type: string, format: date-time, description: 'TTL 15 min si EN_ATTENTE' }
+        capaciteEngagee: { type: boolean, description: 'true uniquement si PAYEE' }
+        qrData: { type: string, nullable: true, description: 'Renseigné après paiement' }
+
+    Erreur:
+      type: object
+      properties:
+        code: { type: integer }
+        message: { type: string }
+        timestamp: { type: string, format: date-time }
+
+  responses:
+    Erreur400:
+      description: Requête invalide
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Erreur' }
+    Erreur403:
+      description: 'Rôle insuffisant (403 — le JwtFilter ne rejette pas, il ne fixe pas le contexte)'
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Erreur' }
+    Erreur404:
+      description: Ressource introuvable
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Erreur' }
+    Erreur409:
+      description: Conflit d'état ou de ressource
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Erreur' }
+    Erreur429:
+      description: Trop de requêtes (rate limiting — 5 req/min/IP sur register, OTP, réservations)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Erreur' }

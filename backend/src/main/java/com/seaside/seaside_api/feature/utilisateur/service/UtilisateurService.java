@@ -107,6 +107,10 @@ public class UtilisateurService {
             throw new RuntimeException("La confirmation ne correspond pas au nouveau mot de passe");
         }
 
+        // CORRECTION P0 : politique NIST (12+ caractères, dictionnaire)
+        com.seaside.seaside_api.feature.auth.service.PasswordPolicy
+                .valider(req.getNouveauMotDePasse(), utilisateur.getEmail());
+
         // 3. Vérifier que le nouveau est différent de l'ancien
         if (passwordEncoder.matches(req.getNouveauMotDePasse(), utilisateur.getMotsDePasseHash())) {
             throw new RuntimeException("Le noueveau mots de passe doit different que  l'ancien");
@@ -215,6 +219,10 @@ public class UtilisateurService {
         }
  
         Utilisateur u = trouverUtilisateur(id);
+ 
+        // CORRECTION P0 : politique NIST (12+ caractères, dictionnaire)
+        com.seaside.seaside_api.feature.auth.service.PasswordPolicy
+                .valider(req.getNouveauMotDePasse(), u.getEmail());
  
         // Hasher et sauvegarder le nouveau mot de passe
         u.setMotsDePasseHash(passwordEncoder.encode(req.getNouveauMotDePasse()));

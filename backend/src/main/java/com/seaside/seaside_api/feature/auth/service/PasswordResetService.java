@@ -66,6 +66,9 @@ public class PasswordResetService {
             throw new RuntimeException("La confirmation ne correspond pas au nouveau mot de passe");
         }
 
+        // CORRECTION P0 : politique NIST (12+ caractères, dictionnaire)
+        PasswordPolicy.valider(nouveauMotDePasse, null);
+
         // Trouver le token en BDD
         PasswordResetToken resetToken = tokenRepository
                 .findByTokenAndEstUtiliseFalse(token)

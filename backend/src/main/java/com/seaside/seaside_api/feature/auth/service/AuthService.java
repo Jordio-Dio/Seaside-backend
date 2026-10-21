@@ -1,6 +1,7 @@
 package com.seaside.seaside_api.feature.auth.service;
 
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -30,6 +31,7 @@ public class AuthService {
     // ─── AJOUT : injecter VerificationEmailService ───────────
     // @RequiredArgsConstructor l'injecte automatiquement via constructeur
     private final VerificationEmailService verificationEmailService;
+    private final LoginAttemptService loginAttemptService;
 
 
     // ---------- Inscription --------------------
@@ -51,13 +53,18 @@ public class AuthService {
             throw new RuntimeException("Ce nom d'utilisateur est deja pris");
         }
 
+        // CORRECTION P0 : politique de mot de passe NIST (longueur + liste commune)
+        PasswordPolicy.valider(request.getMotDePasse(), request.getEmail());
+
         // Creer l'utilisateur avec mot de passe hashe par BCrypt
         Utilisateur utilisateur = Utilisateur.builder()
                 .nomUtilisateur(request.getNomUtilisateur())
                 .email(request.getEmail())
                 .motsDePasseHash(passwordEncoder.encode(request.getMotDePasse()))// ← hash BCrypt
-                // .role(getRole(request))
-                .role(request.getRole())
+                // CORRECTION P0 : le rôle ne vient JAMAIS de la requête client.
+                // Toute inscription libre est CLIENT ; ADMIN est provisionné par un
+                // admin existant, ORGANISATEUR est accordé à la validation d'une demande.
+                .role(RoleUsers.CLIENT)
                 .estActif(true)
                 .build();
 
@@ -80,12 +87,24 @@ public class AuthService {
     // ---------------- Connexion ---------------------
     public AuthResponse seConnecter(LoginRequest request) {
 
-        // Spring security verifie email + mot de passe automatiquement
-        // lance une exception si les credentiels sont incorrectes
-        authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(
-                        request.getEmail(),
-                        request.getMotDePasse()));
+        // CORRECTION P0 : verrouillage après 5 échecs consécutifs (15 min)
+        loginAttemptService.verifierAvantTentative(request.getEmail());
+
+        try {
+            // Spring security verifie email + mot de passe automatiquement
+            // lance une exception si les credentiels sont incorrectes
+            authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(
+                            request.getEmail(),
+                            request.getMotDePasse()));
+        } catch (BadCredentialsException e) {
+            // Échec → compteur de tentatives (verrouillage à partir de 5)
+            loginAttemptService.enregistrerEchec(request.getEmail());
+            throw e;
+        }
+
+        // Succès → remise à zéro du compteur
+        loginAttemptService.reinitialiser(request.getEmail());
 
         // Si on arrive ici , les credentials sont corrects
         Utilisateur utilisateur = utilisateurRepository.findByEmail(request.getEmail())
@@ -125,16 +144,5 @@ public class AuthService {
         Utilisateur utilisateur = (Utilisateur) SecurityContextHolder
                 .getContext().getAuthentication().getPrincipal();
         refreshTokenService.supprimerParUtilisateur(utilisateur);
-    }
-
-    private RoleUsers getRole(RegisterRequest r) {
-        if (r.getRole().equals("ADMIN")) {
-            return RoleUsers.ADMIN;
-        } else if (r.getRole().equals("CLIENT")) {
-            return RoleUsers.CLIENT;
-        } else {
-            return RoleUsers.COMPTOIRE;
-        }
-
     }
 }

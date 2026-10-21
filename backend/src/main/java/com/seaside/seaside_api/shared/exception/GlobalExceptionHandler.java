@@ -100,11 +100,13 @@ public class GlobalExceptionHandler {
     // Toutes les autres erreurs
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleGeneral(Exception ex) {
-        log.error("Erreur interne non gérée", ex);
+        // CORRECTION P0 : ne JAMAIS exposer le nom de la classe ni le message
+        // interne dans la réponse (fuite d'information : chemins, ORM, SQL…).
+        // Le détail complet reste côté serveur dans les logs.
+        log.error("Erreur interne non gérée : {}", ex.getClass().getName(), ex);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(new ErrorResponse(500,
-                        "Erreur interne du serveur : " + ex.getClass().getSimpleName()
-                                + " — " + (ex.getMessage() != null ? ex.getMessage() : "détail inconnu"),
+                        "Erreur interne du serveur — l'équipe a été notifiée",
                         LocalDateTime.now()));
     }
 }

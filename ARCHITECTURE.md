@@ -1,6 +1,10 @@
 # Seaside API — Architecture
 
 > Dernière mise à jour : refactorisation **Feature-First (Vertical Slice)** — Octobre 2026
+>
+> 📐 Diagrammes C4 : voir [docs/ARCHITECTURE_DIAGRAMS.md](docs/ARCHITECTURE_DIAGRAMS.md)
+> 🔁 **Tous les diagrammes de séquence** (auth + firmware ESP32 + licence + temps réel) : voir [docs/SEQUENCE_DIAGRAMS.md](docs/SEQUENCE_DIAGRAMS.md)
+> 🧑‍💻 Briefing d'intégration frontend (contrats API + réservation de places) : voir [docs/FRONTEND_BRIEFING.md](docs/FRONTEND_BRIEFING.md)
 
 ## 1. Vue d'ensemble
 
@@ -110,4 +114,4 @@ com.seaside.seaside_api
 | Licences ESP32 | `feature/licence` (model + repo existants) : ajouter `web/`, `service/`, activation via MQTT, expiration |
 | Ticketing visiteur | nouvelle feature `feature/ticketing` : `Reservation` liée à `Categorie`, QR code, endpoint public |
 | Migration Flyway V1 | versionner le schéma actuel (`db/migration/V1__init_schema.sql`) — requis avant toute prod |
-| Diagrammes C4 | documenter contexte/composants + séquences JWT et MQTT à partir de cette structure |
+| Diagrammes C4 | ✅ livrés dans [docs/ARCHITECTURE_DIAGRAMS.md](docs/ARCHITECTURE_DIAGRAMS.md) (C4 L1/L2 + 4 séquences) |

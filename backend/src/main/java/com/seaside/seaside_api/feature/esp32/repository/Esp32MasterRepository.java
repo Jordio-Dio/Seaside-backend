@@ -14,4 +14,7 @@ public interface Esp32MasterRepository extends JpaRepository<Esp32Master, UUID> 
     Optional<Esp32Master> findFirstByLicence(String licence);
 
     List<Esp32Master> findByCategory_Evenement_Id(UUID evenementId);
+
+    // ─── Dashboard admin : parc connecté ───────────────────
+    long countByConnected(boolean connected);
 }

@@ -35,7 +35,7 @@ public class AuthPasswordController {
             @Valid @RequestBody VerifyEmailRequest req) {
         verificationEmailService.envoyerOtp(req.getEmail());
         return ResponseEntity.ok(OtpResponse.builder()
-                .message("Code envoyé à " + req.getEmail() + " — valable 10 minutes")
+                .message("Code envoyé à " + req.getEmail() + " — valable 5 minutes")
                 .email(req.getEmail())
                 .build());
     }

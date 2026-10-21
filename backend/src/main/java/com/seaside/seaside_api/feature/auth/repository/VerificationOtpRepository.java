@@ -13,6 +13,9 @@ public interface VerificationOtpRepository extends JpaRepository<VerificationOtp
 
     Optional<VerificationOtp> findByEmailAndCodeAndEstVerifieFalse(String email, String code);
 
+    // CORRECTION P0 : dernier OTP d'un email (comptage de tentatives + cooldown)
+    Optional<VerificationOtp> findFirstByEmailOrderByCreeLeDesc(String email);
+
     // Vérifier si un email a déjà un OTP vérifié récent
     boolean existsByEmailAndEstVerifieTrue(String email);
 

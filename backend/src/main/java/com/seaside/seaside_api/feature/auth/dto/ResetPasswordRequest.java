@@ -10,7 +10,7 @@ public class ResetPasswordRequest {
     private String token;
 
     @NotBlank(message = "Le nouveau mot de passe est obligatoire")
-    @Size(min = 6, message = "Le mot de passe doit faire au moins 6 caractères")
+    @Size(min = 12, message = "Le mot de passe doit faire au moins 12 caractères (NIST SP 800-63B)")
     private String nouveauMotDePasse;
 
     @NotBlank(message = "La confirmation est obligatoire")

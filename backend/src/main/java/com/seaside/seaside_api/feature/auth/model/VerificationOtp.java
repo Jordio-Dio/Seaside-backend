@@ -22,9 +22,15 @@ public class VerificationOtp {
     @Column(name = "code", nullable = false, length = 6)
     private String code;
 
-    // Expire dans 10 minutes
+    // Expire dans 5 minutes (CORRECTION P0 — réduit de 10 à 5)
     @Column(name = "expire_le", nullable = false)
     private LocalDateTime expireLe;
+
+    // CORRECTION P0 : nombre de tentatives de saisie du code.
+    // Atteint 5 → le code est refusé définitivement (anti brute-force).
+    @Column(name = "tentatives", nullable = false)
+    @Builder.Default
+    private Integer tentatives = 0;
 
     // True une fois que l'utilisateur a validé le code
     // Empêche la réutilisation du même OTP

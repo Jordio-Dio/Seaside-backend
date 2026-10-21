@@ -21,4 +21,7 @@ public interface EvenementRepository extends JpaRepository<Evenement, UUID> {
     // Seulement les evenements les evenements actifs d'un utilisateur
     List<Evenement> findByUtilisateurIdAndEstActif(UUID utilisateurId, Boolean estActif);
 
+    // ─── Dashboard admin ───────────────────────────────────
+    long countByEstActif(boolean estActif);
+
 }
