@@ -138,14 +138,23 @@ recalculer côté frontend depuis les catégories/entrées).
 
 ### Admin — `/api/admin/**` *(ROLE_ADMIN)*
 ```
-GET    /api/admin/utilisateurs            GET    /api/admin/utilisateurs/{id}
+GET    /api/admin/dashboard                    cartes KPI globales
+GET    /api/admin/demandes?statut=             file d'approbation organisateurs
+POST   /api/admin/demandes/{id}/approuver | /refuser | /ignorer
+GET    /api/admin/licences                     POST /api/admin/licences
+PATCH  /api/admin/licences/{id}/statut
+GET    /api/admin/evenements                   GET /api/admin/evenements/{id}
+PATCH  /api/admin/evenements/{id}/activer | /desactiver
+GET    /api/admin/utilisateurs                 GET /api/admin/utilisateurs/{id}
 PATCH  /api/admin/utilisateurs/{id}/activer | /desactiver | /role | /mot-de-passe
-PUT    /api/admin/utilisateurs/{id}       DELETE /api/admin/utilisateurs/{id}
+PUT    /api/admin/utilisateurs/{id}            DELETE /api/admin/utilisateurs/{id}
 ```
+> Contrat détaillé (payloads, règles métier, écrans à construire, manques à combler) :
+> [ADMIN_API_ET_MANQUES.md](ADMIN_API_ET_MANQUES.md).
 
 ### Stubs (ne pas les appeler — encore vides)
-`CategorieController`, `EntreeController`, `StatsController` : classes vides,
-l'intégration passe par `/api/evenements/{id}/…`.
+`CategorieController`, `EntreeController` : classes vides, l'intégration passe par
+`/api/evenements/{id}/…`. `StatsController` est désormais implémenté (`/api/admin/dashboard`).
 
 ---
 

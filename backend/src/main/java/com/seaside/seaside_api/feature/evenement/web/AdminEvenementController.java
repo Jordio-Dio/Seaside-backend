@@ -5,6 +5,7 @@ import java.util.UUID;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -43,6 +44,31 @@ public class AdminEvenementController {
         Evenement evenement = evenementRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Événement introuvable"));
         return ResponseEntity.ok(toResponse(evenement));
+    }
+
+    // PATCH /admin/evenements/{id}/activer — l'admin peut agir sur
+    // n'importe quel événement (l'endpoint /evenements/{id}/activer du
+    // propriétaire reste réservé à ce dernier).
+    @PatchMapping("/{id}/activer")
+    public ResponseEntity<AdminEvenementResponse> activer(@PathVariable UUID id) {
+        return ResponseEntity.ok(adminToggle(id, true));
+    }
+
+    // PATCH /admin/evenements/{id}/desactiver — suspension (fraude, litige…)
+    @PatchMapping("/{id}/desactiver")
+    public ResponseEntity<AdminEvenementResponse> desactiver(@PathVariable UUID id) {
+        return ResponseEntity.ok(adminToggle(id, false));
+    }
+
+    private AdminEvenementResponse adminToggle(UUID id, boolean actif) {
+        Evenement evenement = evenementRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Événement introuvable"));
+        if (actif) {
+            evenement.activer();
+        } else {
+            evenement.desactiver();
+        }
+        return toResponse(evenementRepository.save(evenement));
     }
 
     private AdminEvenementResponse toResponse(Evenement e) {
